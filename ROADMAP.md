@@ -24,7 +24,16 @@
   the FEC API key server-side and caches responses, so beta users don't
   need to get their own key. The network layer (`common/` provider) is
   already built with a configurable base URL so this is a config change,
-  not a rewrite, once the proxy exists.
+  not a rewrite, once the proxy exists. A server-side cache shared across
+  all users would also help with the next item below — the first person
+  to hit a slow case would absorb that wait once, not every user
+  individually.
+- **Faster/more reliable top-funder breakdowns for high-volume
+  campaigns.** Some committees' Schedule A aggregation queries time out
+  on FEC's own servers (see LIMITATIONS.md). Current mitigation is a
+  client-side 8s timeout plus a short-TTL cache of the "unavailable"
+  outcome; worth revisiting once there's a proxy (see above) or a
+  different aggregation strategy.
 - **Revisit always-on activation.** Before a public Chrome Web Store
   listing, reconsider running on `<all_urls>` by default — e.g. optional
   host permissions, or click-to-activate per site.

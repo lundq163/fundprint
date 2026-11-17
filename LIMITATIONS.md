@@ -20,8 +20,14 @@ Plain-language caveats, kept up to date as Fundprint is built.
   so it's approximated from the largest individual contributions on
   record (contribution limits per PAC are small, so this is normally very
   accurate, but it's not a guaranteed exact ranking). Either section can
-  also say "temporarily unavailable" if the FEC's servers time out
-  computing it — confirmed to happen for extremely high-volume campaigns.
+  also say "temporarily unavailable" — confirmed to happen because FEC's
+  own servers can time out computing this for extremely high-volume
+  campaigns (e.g. a sitting senator's committee, in testing). Fundprint
+  gives up after 8 seconds rather than waiting on FEC's full ~30-second
+  timeout, and remembers that outcome for an hour so repeat hovers don't
+  wait again right away — but it can't make FEC's own query faster. See
+  ROADMAP.md for a possible future fix (a proxy server that absorbs this
+  wait once, server-side, instead of per user).
 - **"Dark money" isn't traceable.** Some groups (certain nonprofits and
   other entities) aren't required to disclose their donors. When a
   funding trail reaches one of these groups, it ends there — Fundprint
