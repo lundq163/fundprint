@@ -91,10 +91,30 @@ const CARD_STYLES = `
     text-decoration: none;
     cursor: pointer;
   }
-  .actions a:focus-visible, .actions button:focus-visible, .close-btn:focus-visible {
+  .actions a:focus-visible, .actions button:focus-visible, .close-btn:focus-visible,
+  .picker-item:focus-visible {
     outline: 2px solid #2a5fa8;
     outline-offset: 1px;
   }
+  .picker-list { margin-top: 8px; }
+  .picker-list li { display: block; margin-bottom: 4px; }
+  .picker-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    font-size: 12px;
+    color: #1a1a1a;
+    background: #fafafa;
+    border: 1px solid #d8d8d8;
+    border-radius: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+  }
+  .picker-item:hover { background: #f0f4f8; }
+  .picker-item-office { margin-left: auto; color: #666; font-size: 11px; white-space: nowrap; }
   .close-btn {
     position: absolute;
     top: 6px;
@@ -384,6 +404,32 @@ function renderInvalidApiKey(name) {
   });
 }
 
+// Shown when a matched name belongs to more than one current legislator
+// (e.g. "Rep. Garcia" — several current House members share that
+// surname). Rather than guessing which one, list them with enough detail
+// to tell them apart, and let the user pick.
+function renderPicker(name, candidates, onChoose) {
+  const children = [
+    el("div", { className: "header" }, [el("span", { className: "name", text: name })]),
+    el("p", { className: "state-message", text: "Multiple current members match this name — who did you mean?" }),
+  ];
+
+  const list = el("ul", { className: "picker-list" });
+  for (const candidate of candidates) {
+    const btn = el("button", { className: "picker-item" });
+    if (candidate.party) btn.appendChild(partyBadge(candidate.party));
+    btn.appendChild(el("span", { className: "picker-item-name", text: candidate.name }));
+    if (candidate.chamber) {
+      btn.appendChild(el("span", { className: "picker-item-office", text: officeLabel(candidate) }));
+    }
+    btn.addEventListener("click", () => onChoose(candidate.id, candidate.name));
+    list.appendChild(el("li", {}, [btn]));
+  }
+  children.push(list);
+
+  bodyEl.replaceChildren(...children);
+}
+
 function renderSummary(summary) {
   const children = [];
 
@@ -512,21 +558,55 @@ async function openCardFor(span) {
   currentSpan = span;
   isCardOpen = true;
   span.setAttribute("aria-expanded", "true");
-  const token = ++requestToken;
 
   const name = span.dataset.fundprintName || span.textContent;
-  renderLoading(name);
-  positionCard(span.getBoundingClientRect());
-
   const ids = (span.dataset.fundprintIds || "").split(",").filter(Boolean);
-  // Milestone 3 scope: when a name is ambiguous (multiple ids), just use
-  // the first one. A proper disambiguation picker is a known follow-up
-  // (see MVP spec's name-matching edge cases) before this ships broadly.
-  const id = ids[0];
-  if (!id) {
+
+  if (ids.length === 0) {
+    ++requestToken; // invalidate any in-flight fetch for a previous span
     renderNotFound(name);
+    positionCard(span.getBoundingClientRect());
     return;
   }
+
+  if (ids.length > 1) {
+    ++requestToken;
+    renderPicker(name, parseCandidates(span, ids), (chosenId, chosenName) => {
+      // The clicked/activated picker button is about to be removed from
+      // the DOM (loadAndRenderSummary replaces the card's content) —
+      // without this, a keyboard user's focus would drop to <body>,
+      // silently breaking the Tab-trap for the rest of this card's life.
+      // Order matters here: span.focus() synchronously re-enters
+      // openCardFor via onFocusIn (re-rendering the picker, harmlessly,
+      // since ids are unchanged), but that finishes before
+      // loadAndRenderSummary runs — so its renderLoading call is the
+      // last write and wins, with a fresh valid token. Calling these in
+      // the other order would let the picker's re-render clobber
+      // loadAndRenderSummary's output instead.
+      span.focus();
+      loadAndRenderSummary(span, chosenId, chosenName);
+    });
+    positionCard(span.getBoundingClientRect());
+    return;
+  }
+
+  await loadAndRenderSummary(span, ids[0], name);
+}
+
+function parseCandidates(span, ids) {
+  try {
+    const parsed = JSON.parse(span.dataset.fundprintCandidates || "[]");
+    if (Array.isArray(parsed) && parsed.length === ids.length) return parsed;
+  } catch {
+    // fall through to the bare-id fallback below
+  }
+  return ids.map((id) => ({ id, name: id, party: null, state: null, district: null, chamber: null }));
+}
+
+async function loadAndRenderSummary(span, id, name) {
+  const token = ++requestToken;
+  renderLoading(name);
+  positionCard(span.getBoundingClientRect());
 
   // Fired in parallel, not chained: totals are a fast, non-aggregating
   // call and top funders are a slow aggregating one. Waiting for both

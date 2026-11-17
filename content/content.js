@@ -45,6 +45,7 @@ async function main() {
 
   let matcher = null;
   let closeCard = null;
+  let legislatorById = null; // only for ambiguous matches — see wrapMatches
   let depsLoadedPromise = null;
 
   function ensureDeps() {
@@ -55,6 +56,12 @@ async function main() {
         import(chrome.runtime.getURL("content/card.js")),
       ]).then(([legislators, { buildMatcher }, card]) => {
         matcher = buildMatcher(legislators.map((l) => ({ id: l.id, names: l.names })));
+        legislatorById = new Map(
+          legislators.map((l) => [
+            l.id,
+            { id: l.id, name: `${l.first} ${l.last}`, party: l.party, state: l.state, district: l.district, chamber: l.chamber },
+          ])
+        );
         closeCard = card.closeCard;
         card.initHoverCard();
       });
@@ -110,6 +117,16 @@ async function main() {
       span.className = "fundprint-match";
       span.dataset.fundprintIds = m.ids.join(",");
       span.dataset.fundprintName = m.text;
+      if (m.ids.length > 1) {
+        // Ambiguous match (e.g. "Rep. Garcia" — several current House
+        // members share that surname). card.js shows a picker rather than
+        // guessing; it needs enough to tell the candidates apart, which a
+        // bare id doesn't provide, so attach it now while we have the
+        // full legislator list in hand.
+        span.dataset.fundprintCandidates = JSON.stringify(
+          m.ids.map((id) => legislatorById.get(id)).filter(Boolean)
+        );
+      }
       // Focusable so keyboard users can reach it; card.js handles what
       // happens on hover/focus. The ARIA attributes tell assistive tech
       // this is an interactive control that opens a dialog, not just a

@@ -18,6 +18,12 @@
   names, focus management, color-contrast fixes) and a couple of
   performance hardenings for long/dynamic pages (see commit history for
   Milestone 7 specifics).
+- Name disambiguation picker in the hover card: when a matched name
+  belongs to more than one current legislator (e.g. "Rep. Garcia"), it
+  lists them (with office/party) instead of guessing. The right-click
+  fallback can't show an interactive picker, so it notifies with the
+  possibilities and points to the hover card instead (see
+  LIMITATIONS.md).
 
 Not published to the Chrome Web Store yet — see below.
 
@@ -49,9 +55,6 @@ Not published to the Chrome Web Store yet — see below.
 - **State and local races.**
 - **New entity types beyond politicians** (e.g. companies), via new data
   providers behind the same matcher/provider/UI architecture.
-- **Name disambiguation picker.** When a matched name belongs to more
-  than one current legislator (e.g. "Rep. Garcia"), show a picker instead
-  of just using the first match (current behavior — see LIMITATIONS.md).
 - **Firefox / Edge support.**
 - **Chrome Web Store listing**, including store-review-ready copy for the
   `<all_urls>` permission justification.

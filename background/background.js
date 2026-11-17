@@ -12,6 +12,7 @@
 
 import { getSummary, getTopFunders, getCandidateDetail, getFunderDetail } from "../providers/fecProvider.js";
 import { buildMatcher } from "../common/matcher.js";
+import { getLegislator } from "../common/legislators.js";
 
 const LOOKUP_MENU_ID = "fundprint-lookup";
 
@@ -82,11 +83,25 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
     }
 
     // A longer selection could contain more than one name; use the first
-    // one found. If that name itself is ambiguous (shared by more than
-    // one current legislator), use the first id — same known limitation
-    // as the hover card (see LIMITATIONS.md).
-    const id = matches[0].ids[0];
-    chrome.tabs.create({ url: chrome.runtime.getURL(`detail/candidate.html?id=${encodeURIComponent(id)}`) });
+    // one found.
+    const { ids, text } = matches[0];
+
+    if (ids.length > 1) {
+      // Unlike the hover card, there's no interactive picker possible
+      // here — this is a one-shot action with only a notification as
+      // feedback. Rather than guess, list who it could be and point the
+      // user at the hover card instead, which can disambiguate properly.
+      const legislators = await Promise.all(ids.map((id) => getLegislator(id)));
+      const names = legislators
+        .filter(Boolean)
+        .map((l) => `${l.first} ${l.last} (${l.chamber === "sen" ? "Sen." : "Rep."}, ${l.state}${l.district != null ? "-" + l.district : ""})`);
+      notify(`"${text}" matches more than one current member: ${names.join("; ")}. Try hovering the name on the page instead — it can show a picker.`);
+      return;
+    }
+
+    chrome.tabs.create({
+      url: chrome.runtime.getURL(`detail/candidate.html?id=${encodeURIComponent(ids[0])}`),
+    });
   } catch (err) {
     // Without this, a failure here (e.g. the legislators.json fetch
     // failing) was silently swallowed — right-click did nothing with no

@@ -55,9 +55,11 @@ Plain-language caveats, kept up to date as Fundprint is built.
 - **Name matching isn't perfect.** It's possible for a name on a page to
   be missed, or for a match to be incorrect. When multiple candidates
   share a matched name (e.g. "Rep. Garcia" — several current House
-  members share that surname), Fundprint currently just shows data for
-  one of them rather than asking which one — a disambiguation picker is
-  planned but not built yet.
+  members share that surname), the hover card shows a picker listing
+  them (with office/party) so you can choose — but the right-click
+  "Look up funding" fallback can't show an interactive picker, so for an
+  ambiguous selection it just lists the possibilities in a notification
+  and asks you to use the hover card instead of guessing.
 - **You need your own free API key during the beta.** Fundprint uses the
   official OpenFEC API, which requires a free key from api.data.gov. A
   future version may remove this requirement via a proxy server (see
