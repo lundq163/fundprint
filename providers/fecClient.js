@@ -15,7 +15,18 @@ export class FecApiError extends Error {
   }
 }
 
-export async function fecGet(path, params, apiKey) {
+const DEFAULT_TIMEOUT_MS = 8000;
+
+// FEC aggregation queries (schedule_a/by_employer, and our own client-side
+// aggregation over schedule_a) can genuinely time out server-side for very
+// high-volume committees — confirmed in testing against a sitting
+// senator's committee, where FEC's own server took on the order of 30
+// seconds before giving up with a 504. Waiting that long to find out is a
+// bad experience, especially since it was blocking the whole card, not
+// just the slow section. Aborting client-side after DEFAULT_TIMEOUT_MS
+// fails fast instead — the card can show what it already has sooner, and
+// mark just the slow section unavailable.
+export async function fecGet(path, params, apiKey, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   const url = new URL(BASE_URL + path);
   for (const [key, value] of Object.entries(params || {})) {
     if (value === null || value === undefined) continue;
@@ -23,11 +34,18 @@ export async function fecGet(path, params, apiKey) {
   }
   url.searchParams.set("api_key", apiKey);
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response;
   try {
-    response = await fetch(url);
+    response = await fetch(url, { signal: controller.signal });
   } catch (err) {
+    if (err.name === "AbortError") {
+      throw new FecApiError("error", `FEC API request timed out after ${timeoutMs}ms`);
+    }
     throw new FecApiError("error", `Network error contacting FEC API: ${err.message}`);
+  } finally {
+    clearTimeout(timer);
   }
 
   if (response.status === 429) {

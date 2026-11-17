@@ -8,7 +8,7 @@
 //    network calls to the FEC API happen here, never in the content
 //    script or detail pages — they only ever message us.
 
-import { getSummary } from "../providers/fecProvider.js";
+import { getSummary, getTopFunders } from "../providers/fecProvider.js";
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") {
@@ -19,6 +19,9 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "FUNDPRINT_GET_SUMMARY") {
     return getSummary(message.id);
+  }
+  if (message?.type === "FUNDPRINT_GET_TOP_FUNDERS") {
+    return getTopFunders(message.id);
   }
   if (message?.type === "FUNDPRINT_OPEN_OPTIONS") {
     // chrome.runtime.openOptionsPage() isn't available to content scripts,

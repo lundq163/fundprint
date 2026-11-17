@@ -15,8 +15,8 @@
 //
 // All dynamic/external text (names, committee/employer labels) is written
 // via textContent, never innerHTML — the static chrome around it is the
-// only innerHTML, and it contains no interpolated data. This matters more
-// once Milestone 4 plugs in live FEC API text.
+// only innerHTML, and it contains no interpolated data. This matters
+// because committee/employer names come straight from live FEC API data.
 
 const HOVER_DELAY_MS = 350;
 const CLOSE_DELAY_MS = 300;
@@ -110,7 +110,19 @@ const CARD_STYLES = `
     border-radius: 3px;
   }
   .close-btn:hover { background: #eee; }
-  .state-message { color: #555; padding: 4px 0; }
+  .state-message { display: flex; align-items: center; gap: 6px; color: #555; padding: 4px 0; }
+  .spinner {
+    flex-shrink: 0;
+    width: 11px;
+    height: 11px;
+    border: 2px solid #d8d8d8;
+    border-top-color: #1a3a5c;
+    border-radius: 50%;
+    animation: fundprint-spin 0.7s linear infinite;
+  }
+  @keyframes fundprint-spin {
+    to { transform: rotate(360deg); }
+  }
 `;
 
 let hostEl = null;
@@ -300,10 +312,14 @@ function officeLabel(summary) {
   return `U.S. House — ${summary.state}${summary.district != null ? `-${summary.district}` : ""}`;
 }
 
+function loadingRow(text) {
+  return el("p", { className: "state-message" }, [el("span", { className: "spinner" }), el("span", { text })]);
+}
+
 function renderLoading(name) {
   bodyEl.replaceChildren(
     el("div", { className: "header" }, [el("span", { className: "name", text: name })]),
-    el("p", { className: "state-message", text: "Loading funding summary…" })
+    loadingRow("Loading funding summary…")
   );
 }
 
@@ -379,9 +395,11 @@ function renderSummary(summary) {
   children.push(split);
 
   children.push(el("h4", { text: "Top contributing committees" }));
-  if (summary.topCommitteesUnavailable) {
+  if (summary.topCommittees === undefined) {
+    children.push(loadingRow("Loading…"));
+  } else if (summary.topCommitteesUnavailable) {
     children.push(el("p", { className: "state-message", text: "Temporarily unavailable." }));
-  } else if (summary.topCommittees?.length) {
+  } else if (summary.topCommittees.length) {
     const list = el("ul");
     for (const committee of summary.topCommittees) {
       const btn = el("button", { className: "funder-link", text: committee.name });
@@ -397,9 +415,11 @@ function renderSummary(summary) {
   // employer only (never show names), and there's no further "funder"
   // page for an employer bucket the way there is for a PAC.
   children.push(el("h4", { text: "Top employers of individual donors" }));
-  if (summary.topEmployersUnavailable) {
+  if (summary.topEmployers === undefined) {
+    children.push(loadingRow("Loading…"));
+  } else if (summary.topEmployersUnavailable) {
     children.push(el("p", { className: "state-message", text: "Temporarily unavailable." }));
-  } else if (summary.topEmployers?.length) {
+  } else if (summary.topEmployers.length) {
     const list = el("ul");
     for (const employer of summary.topEmployers) {
       list.appendChild(
@@ -477,9 +497,21 @@ async function openCardFor(span) {
     return;
   }
 
+  // Fired in parallel, not chained: totals are a fast, non-aggregating
+  // call and top funders are a slow aggregating one. Waiting for both
+  // before showing anything (the original approach) meant the whole card
+  // stalled for as long as the slowest part — up to ~30s for very
+  // high-volume committees. Rendering totals as soon as they arrive, with
+  // the funder sections filled in a moment later, is what actually fixes
+  // the perceived wait.
+  const summaryRequest = chrome.runtime.sendMessage({ type: "FUNDPRINT_GET_SUMMARY", id });
+  const fundersRequest = chrome.runtime
+    .sendMessage({ type: "FUNDPRINT_GET_TOP_FUNDERS", id })
+    .catch(() => ({ topCommittees: [], topCommitteesUnavailable: true, topEmployers: [], topEmployersUnavailable: true }));
+
   let summary;
   try {
-    summary = await chrome.runtime.sendMessage({ type: "FUNDPRINT_GET_SUMMARY", id });
+    summary = await summaryRequest;
   } catch {
     if (token === requestToken) renderError(name);
     return;
@@ -488,18 +520,35 @@ async function openCardFor(span) {
   if (token !== requestToken) return; // user moved on before this resolved
   if (!summary || summary.notFound) {
     renderNotFound(name);
-  } else if (summary.missingApiKey) {
-    renderMissingApiKey(name);
-  } else if (summary.invalidApiKey) {
-    renderInvalidApiKey(name);
-  } else if (summary.rateLimited) {
-    renderRateLimited(name);
-  } else if (summary.error) {
-    renderError(name);
-  } else {
-    renderSummary(summary);
-    positionCard(span.getBoundingClientRect());
+    return;
   }
+  if (summary.missingApiKey) {
+    renderMissingApiKey(name);
+    return;
+  }
+  if (summary.invalidApiKey) {
+    renderInvalidApiKey(name);
+    return;
+  }
+  if (summary.rateLimited) {
+    renderRateLimited(name);
+    return;
+  }
+  if (summary.error) {
+    renderError(name);
+    return;
+  }
+
+  // Render totals now; top committees/employers show a loading spinner
+  // until fundersRequest resolves below.
+  renderSummary(summary);
+  positionCard(span.getBoundingClientRect());
+
+  const funders = await fundersRequest;
+  if (token !== requestToken) return; // user moved on before this resolved
+
+  renderSummary({ ...summary, ...funders });
+  positionCard(span.getBoundingClientRect());
 }
 
 function closeCard() {
