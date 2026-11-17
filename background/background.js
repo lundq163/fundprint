@@ -4,17 +4,11 @@
 //  - Milestone 1: open the welcome page on first install.
 //  - Milestone 3: answer FUNDPRINT_GET_SUMMARY requests from the content
 //    script's hover card, by calling a provider module.
-//  - Later: own all real network calls to the FEC API too (content
-//    scripts and detail pages never call the network directly, they
-//    message us). Centralizing network access here is also what makes it
-//    possible to later point everything at a proxy server with one
-//    config change.
+//  - Milestone 4: that provider is now the real FEC-backed one. All
+//    network calls to the FEC API happen here, never in the content
+//    script or detail pages — they only ever message us.
 
-// Milestone 3: swap this import for a real FEC-backed provider in
-// Milestone 4. Nothing outside this file needs to change — the content
-// script and detail pages only ever talk to us via FUNDPRINT_GET_SUMMARY,
-// never to a provider module directly.
-import { getSummary } from "../providers/mockProvider.js";
+import { getSummary } from "../providers/fecProvider.js";
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") {
@@ -25,5 +19,10 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "FUNDPRINT_GET_SUMMARY") {
     return getSummary(message.id);
+  }
+  if (message?.type === "FUNDPRINT_OPEN_OPTIONS") {
+    // chrome.runtime.openOptionsPage() isn't available to content scripts,
+    // so the card asks us to do it instead of linking there directly.
+    chrome.runtime.openOptionsPage();
   }
 });

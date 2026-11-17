@@ -44,16 +44,6 @@ const CARD_STYLES = `
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
     padding: 12px 14px;
   }
-  .mock-badge {
-    display: inline-block;
-    font-size: 11px;
-    color: #7a5b00;
-    background: #fff4d6;
-    border: 1px solid #f0d78c;
-    border-radius: 4px;
-    padding: 1px 6px;
-    margin-bottom: 6px;
-  }
   .header { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin-bottom: 2px; }
   .name { font-weight: 600; font-size: 14px; }
   .party-badge {
@@ -317,26 +307,47 @@ function renderLoading(name) {
   );
 }
 
-function renderNotFound(name) {
-  bodyEl.replaceChildren(
+function renderStateMessage(name, message, { openOptionsButton = false } = {}) {
+  const children = [
     el("div", { className: "header" }, [el("span", { className: "name", text: name })]),
-    el("p", { className: "state-message", text: "No funding data found for this person." })
-  );
+    el("p", { className: "state-message", text: message }),
+  ];
+  if (openOptionsButton) {
+    const btn = el("button", { text: "Open options" });
+    btn.addEventListener("click", () => {
+      chrome.runtime.sendMessage({ type: "FUNDPRINT_OPEN_OPTIONS" });
+    });
+    children.push(el("div", { className: "actions" }, [btn]));
+  }
+  bodyEl.replaceChildren(...children);
+}
+
+function renderNotFound(name) {
+  renderStateMessage(name, "No funding data found for this person.");
 }
 
 function renderError(name) {
-  bodyEl.replaceChildren(
-    el("div", { className: "header" }, [el("span", { className: "name", text: name })]),
-    el("p", { className: "state-message", text: "Something went wrong loading this summary. Try again shortly." })
-  );
+  renderStateMessage(name, "Something went wrong loading this summary. Try again shortly.");
+}
+
+function renderRateLimited(name) {
+  renderStateMessage(name, "The FEC API's rate limit was reached. Try again in a few minutes.");
+}
+
+function renderMissingApiKey(name) {
+  renderStateMessage(name, "Add your free FEC API key in Fundprint's options to see funding data.", {
+    openOptionsButton: true,
+  });
+}
+
+function renderInvalidApiKey(name) {
+  renderStateMessage(name, "Your FEC API key looks invalid. Check it in Fundprint's options.", {
+    openOptionsButton: true,
+  });
 }
 
 function renderSummary(summary) {
   const children = [];
-
-  if (summary.isMock) {
-    children.push(el("div", { className: "mock-badge", text: "Mock data (Milestone 4 adds real FEC data)" }));
-  }
 
   children.push(
     el("div", { className: "header" }, [el("span", { className: "name", text: summary.name }), partyBadge(summary.party)]),
@@ -367,8 +378,10 @@ function renderSummary(summary) {
   }
   children.push(split);
 
-  if (summary.topCommittees?.length) {
-    children.push(el("h4", { text: "Top contributing committees" }));
+  children.push(el("h4", { text: "Top contributing committees" }));
+  if (summary.topCommitteesUnavailable) {
+    children.push(el("p", { className: "state-message", text: "Temporarily unavailable." }));
+  } else if (summary.topCommittees?.length) {
     const list = el("ul");
     for (const committee of summary.topCommittees) {
       const btn = el("button", { className: "funder-link", text: committee.name });
@@ -376,13 +389,17 @@ function renderSummary(summary) {
       list.appendChild(el("li", {}, [btn, el("span", { text: formatMoney(committee.amount) })]));
     }
     children.push(list);
+  } else {
+    children.push(el("p", { className: "state-message", text: "None reported this cycle." }));
   }
 
-  if (summary.topEmployers?.length) {
-    // Deliberately plain text, not clickable: we group individual donors
-    // by employer only (never show names), and there's no further
-    // "funder" page for an employer bucket the way there is for a PAC.
-    children.push(el("h4", { text: "Top employers of individual donors" }));
+  // Deliberately plain text, not clickable: we group individual donors by
+  // employer only (never show names), and there's no further "funder"
+  // page for an employer bucket the way there is for a PAC.
+  children.push(el("h4", { text: "Top employers of individual donors" }));
+  if (summary.topEmployersUnavailable) {
+    children.push(el("p", { className: "state-message", text: "Temporarily unavailable." }));
+  } else if (summary.topEmployers?.length) {
     const list = el("ul");
     for (const employer of summary.topEmployers) {
       list.appendChild(
@@ -390,6 +407,8 @@ function renderSummary(summary) {
       );
     }
     children.push(list);
+  } else {
+    children.push(el("p", { className: "state-message", text: "None itemized this cycle." }));
   }
 
   children.push(el("div", { className: "as-of", text: `Data as of ${summary.asOfDate}` }));
@@ -469,6 +488,14 @@ async function openCardFor(span) {
   if (token !== requestToken) return; // user moved on before this resolved
   if (!summary || summary.notFound) {
     renderNotFound(name);
+  } else if (summary.missingApiKey) {
+    renderMissingApiKey(name);
+  } else if (summary.invalidApiKey) {
+    renderInvalidApiKey(name);
+  } else if (summary.rateLimited) {
+    renderRateLimited(name);
+  } else if (summary.error) {
+    renderError(name);
   } else {
     renderSummary(summary);
     positionCard(span.getBoundingClientRect());

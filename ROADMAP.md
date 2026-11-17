@@ -2,7 +2,8 @@
 
 ## v1 (current focus)
 
-- Federal candidates (House, Senate, President) only.
+- Current US House and Senate members only (see LIMITATIONS.md for why
+  presidential candidates aren't included yet).
 - Name detection against a bundled list built from the
   unitedstates/congress-legislators dataset.
 - Hover card with a funding summary, sourced live from the OpenFEC API.
@@ -30,7 +31,9 @@
 - **State and local races.**
 - **New entity types beyond politicians** (e.g. companies), via new data
   providers behind the same matcher/provider/UI architecture.
-- **Better name disambiguation** (beyond the current same-name picker).
+- **Name disambiguation picker.** When a matched name belongs to more
+  than one current legislator (e.g. "Rep. Garcia"), show a picker instead
+  of just using the first match (current behavior — see LIMITATIONS.md).
 - **Firefox / Edge support.**
 - **Chrome Web Store listing**, including store-review-ready copy for the
   `<all_urls>` permission justification.
