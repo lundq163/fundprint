@@ -37,7 +37,14 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["common/matcher.js", "common/storage.js", "data/legislators.json"],
+      "resources": [
+        "common/matcher.js",
+        "common/storage.js",
+        "data/legislators.json",
+        "content/card.js",
+        "detail/candidate.html",
+        "detail/funder.html"
+      ],
       "matches": ["<all_urls>"]
     }
   ],

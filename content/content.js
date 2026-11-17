@@ -1,8 +1,10 @@
 // Content script: finds candidate names in the page's text and wraps them
 // in an underlined span. Runs on every page (see manifest + LIMITATIONS.md
 // for why, during the beta) but does no network calls itself — matching
-// happens entirely against the bundled legislators.json file. The only
-// messages it sends anywhere are local (to the popup, reporting a count).
+// happens entirely against the bundled legislators.json file. Messages
+// only ever go to the popup (reporting a match count) or to our own
+// background worker (the hover card, in card.js, asking for a summary) —
+// never to anywhere outside the extension.
 //
 // Loaded as a classic script (content_scripts don't support ES modules
 // directly), but it dynamically imports the real ES modules it depends on
@@ -40,10 +42,12 @@ async function main() {
 
   if (disabled) return;
 
-  const legislators = await fetch(chrome.runtime.getURL("data/legislators.json")).then((r) =>
-    r.json()
-  );
+  const [legislators, { initHoverCard }] = await Promise.all([
+    fetch(chrome.runtime.getURL("data/legislators.json")).then((r) => r.json()),
+    import(chrome.runtime.getURL("content/card.js")),
+  ]);
   const matcher = buildMatcher(legislators.map((l) => ({ id: l.id, names: l.names })));
+  initHoverCard();
 
   const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT", "SELECT", "OPTION"]);
   const seen = new WeakSet(); // text nodes already scanned, so repeat mutation batches don't redo work
@@ -89,7 +93,8 @@ async function main() {
       span.className = "fundprint-match";
       span.dataset.fundprintIds = m.ids.join(",");
       span.dataset.fundprintName = m.text;
-      // Not wired up yet — hover/focus card behavior arrives in Milestone 3.
+      // Focusable so keyboard users can reach it; card.js handles what
+      // happens on hover/focus.
       span.tabIndex = 0;
       span.textContent = m.text;
       frag.appendChild(span);

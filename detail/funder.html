@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Fundprint — Funder detail</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2.5rem auto; padding: 0 1.5rem; color: #1a1a1a; }
+  </style>
+</head>
+<body>
+  <h1>Funder detail (placeholder)</h1>
+  <p>
+    This page will show what kind of committee id
+    <code id="funder-id">?</code> is, its total receipts, its own top
+    funders, and which candidates it has given to most.
+  </p>
+  <p><em>Built out in Milestone 5. For now this just confirms a committee link opens the right page.</em></p>
+  <script>
+    document.getElementById("funder-id").textContent =
+      new URLSearchParams(location.search).get("id") || "(none)";
+  </script>
+</body>
+</html>
