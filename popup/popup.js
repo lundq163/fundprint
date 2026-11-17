@@ -9,8 +9,11 @@ const globalToggle = document.getElementById("global-toggle");
 const siteToggle = document.getElementById("site-toggle");
 const siteHostLabel = document.getElementById("site-host");
 const openOptionsLink = document.getElementById("open-options");
+const matchCountEl = document.getElementById("match-count");
+const countNoteEl = document.getElementById("count-note");
 
 let currentHostname = null;
+let currentTabId = null;
 
 async function init() {
   globalToggle.checked = await getGlobalEnabled();
@@ -21,6 +24,7 @@ async function init() {
   if (tab && tab.url) {
     try {
       currentHostname = new URL(tab.url).hostname;
+      currentTabId = tab.id;
     } catch {
       currentHostname = null;
     }
@@ -33,6 +37,34 @@ async function init() {
     // e.g. chrome:// pages, the new tab page, etc.
     siteHostLabel.textContent = "this page";
     siteToggle.disabled = true;
+  }
+
+  await refreshMatchCount();
+}
+
+async function refreshMatchCount() {
+  if (!currentTabId) {
+    matchCountEl.textContent = "—";
+    return;
+  }
+  try {
+    const response = await chrome.tabs.sendMessage(currentTabId, {
+      type: "FUNDPRINT_GET_MATCH_COUNT",
+    });
+    if (response?.disabled) {
+      matchCountEl.textContent = "—";
+      countNoteEl.textContent = "Fundprint is off for this page.";
+      countNoteEl.hidden = false;
+    } else {
+      matchCountEl.textContent = String(response?.count ?? 0);
+      countNoteEl.hidden = true;
+    }
+  } catch {
+    // No content script here (e.g. a chrome:// page, the Chrome Web
+    // Store, or a page that was open before the extension was loaded).
+    matchCountEl.textContent = "—";
+    countNoteEl.textContent = "Fundprint isn't active on this page.";
+    countNoteEl.hidden = false;
   }
 }
 

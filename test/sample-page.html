@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Fundprint Milestone 2 test page</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+    section { margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #ddd; }
+    h2 { font-size: 1rem; color: #555; }
+    textarea { width: 100%; height: 3rem; }
+    [contenteditable] { border: 1px dashed #aaa; padding: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Fundprint Milestone 2 test page</h1>
+  <p>Load this via <code>python3 -m http.server</code> (not <code>file://</code>) with the extension loaded. Expected results are noted in each section — actual underlining is checked against the loaded extension, not described here.</p>
+
+  <section>
+    <h2>1. Plain full-name mention</h2>
+    <p>Senator Bernie Sanders has represented Vermont since 2007.</p>
+  </section>
+
+  <section>
+    <h2>2. Name inside a link (link behavior must still work)</h2>
+    <p>
+      You can read more on
+      <a href="https://www.congress.gov/member/maria-cantwell/C000127">Maria Cantwell</a>'s
+      official Congress.gov page.
+    </p>
+  </section>
+
+  <section>
+    <h2>3. Duplicate name (same person, multiple mentions/variants)</h2>
+    <p>Bernie Sanders caucuses with Senate Democrats.</p>
+    <p>Sen. Sanders chairs the Senate Budget Committee.</p>
+  </section>
+
+  <section>
+    <h2>4. Bare last name only (should NOT be underlined)</h2>
+    <p>A spokesperson named Smith declined to comment for this story.</p>
+  </section>
+
+  <section>
+    <h2>5. Skipped elements (should NOT be underlined)</h2>
+    <p>Textarea content: <textarea>Bernie Sanders</textarea></p>
+    <p>Contenteditable content: <span contenteditable="true">Bernie Sanders</span></p>
+  </section>
+
+  <section>
+    <h2>6. Dynamically loaded content (appears ~2 seconds after page load)</h2>
+    <div id="dynamic-content"><em>(waiting for delayed content…)</em></div>
+  </section>
+
+  <script>
+    setTimeout(() => {
+      const el = document.getElementById("dynamic-content");
+      el.innerHTML =
+        "<p>Breaking: Sen. Warren spoke on the floor today. " +
+        "Elizabeth Warren has served Massachusetts since 2013.</p>";
+    }, 2000);
+  </script>
+</body>
+</html>

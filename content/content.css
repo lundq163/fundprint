@@ -1,0 +1,16 @@
+/*
+ * Styling for a detected name on the page. Deliberately minimal so it
+ * can't be mistaken for a link (no color change) and can't shift layout
+ * (no padding/margin/border, inline display). The !important on the
+ * decoration properties is there because many sites reset text-decoration
+ * globally (e.g. `a { text-decoration: none }` resets); without it our
+ * underline would silently disappear on those sites.
+ */
+.fundprint-match {
+  color: inherit;
+  text-decoration-line: underline !important;
+  text-decoration-style: dotted !important;
+  text-decoration-color: #767676 !important;
+  text-decoration-thickness: 1px !important;
+  text-underline-offset: 2px;
+}

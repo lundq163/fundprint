@@ -40,10 +40,14 @@ and treats every candidate and party identically.
 
 - [OpenFEC API](https://api.open.fec.gov/developers/) — official FEC data,
   queried live, cached locally for up to 24 hours.
-- [unitedstates/congress-legislators](https://github.com/unitedstates/congress-legislators) —
-  the bundled list of current federal legislators and their FEC candidate
-  IDs, used for name matching. See `scripts/` for how this list is
-  regenerated.
+- [unitedstates/congress-legislators](https://github.com/unitedstates/congress-legislators)
+  (CC0-1.0 / public domain) — the bundled list of current federal
+  legislators and their FEC candidate IDs, used for name matching.
+  Regenerate `data/legislators.json` any time with:
+  ```
+  pip3 install pyyaml
+  python3 scripts/build_legislators.py
+  ```
 
 ## Privacy
 
