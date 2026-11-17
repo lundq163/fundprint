@@ -20,11 +20,18 @@ chrome.runtime.onInstalled.addListener((details) => {
   // has to run on every onInstalled firing (install AND update), not just
   // first install. removeAll() first makes it safe to run repeatedly.
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
-      id: LOOKUP_MENU_ID,
-      title: "Look up funding",
-      contexts: ["selection"],
-    });
+    chrome.contextMenus.create(
+      {
+        id: LOOKUP_MENU_ID,
+        title: "Look up funding",
+        contexts: ["selection"],
+      },
+      () => {
+        if (chrome.runtime.lastError) {
+          console.error("Fundprint: context menu creation failed —", chrome.runtime.lastError.message);
+        }
+      }
+    );
   });
 
   if (details.reason === "install") {
@@ -45,29 +52,48 @@ function getMatcher() {
   return matcherPromise;
 }
 
+function notify(message) {
+  chrome.notifications.create({
+    type: "basic",
+    iconUrl: chrome.runtime.getURL("icons/icon128.png"),
+    title: "Fundprint",
+    message,
+  }, () => {
+    // chrome.notifications.create() reports failures via lastError rather
+    // than a rejected promise/thrown error — has to be checked explicitly
+    // or a failure (e.g. OS notifications blocked for Chrome) is invisible.
+    if (chrome.runtime.lastError) {
+      console.error("Fundprint: notification failed —", chrome.runtime.lastError.message);
+    }
+  });
+}
+
 chrome.contextMenus.onClicked.addListener(async (info) => {
   if (info.menuItemId !== LOOKUP_MENU_ID) return;
 
-  const selectedText = info.selectionText || "";
-  const matcher = await getMatcher();
-  const matches = matcher.findMatches(selectedText);
+  try {
+    const selectedText = info.selectionText || "";
+    const matcher = await getMatcher();
+    const matches = matcher.findMatches(selectedText);
 
-  if (matches.length === 0) {
-    chrome.notifications.create({
-      type: "basic",
-      iconUrl: chrome.runtime.getURL("icons/icon128.png"),
-      title: "Fundprint",
-      message: `No current member of Congress matched "${selectedText.slice(0, 60)}".`,
-    });
-    return;
+    if (matches.length === 0) {
+      notify(`No current member of Congress matched "${selectedText.slice(0, 60)}".`);
+      return;
+    }
+
+    // A longer selection could contain more than one name; use the first
+    // one found. If that name itself is ambiguous (shared by more than
+    // one current legislator), use the first id — same known limitation
+    // as the hover card (see LIMITATIONS.md).
+    const id = matches[0].ids[0];
+    chrome.tabs.create({ url: chrome.runtime.getURL(`detail/candidate.html?id=${encodeURIComponent(id)}`) });
+  } catch (err) {
+    // Without this, a failure here (e.g. the legislators.json fetch
+    // failing) was silently swallowed — right-click did nothing with no
+    // feedback and no visible error outside the service worker console.
+    console.error("Fundprint: 'Look up funding' failed —", err);
+    notify("Something went wrong looking that up. Check the service worker console for details.");
   }
-
-  // A longer selection could contain more than one name; use the first
-  // one found. If that name itself is ambiguous (shared by more than one
-  // current legislator), use the first id — same known limitation as the
-  // hover card (see LIMITATIONS.md).
-  const id = matches[0].ids[0];
-  chrome.tabs.create({ url: chrome.runtime.getURL(`detail/candidate.html?id=${encodeURIComponent(id)}`) });
 });
 
 chrome.runtime.onMessage.addListener((message) => {
