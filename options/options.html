@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Fundprint Options</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main>
+    <h1>Fundprint Options</h1>
+
+    <section>
+      <h2>FEC API key</h2>
+      <p>
+        Fundprint needs a free <a href="https://api.data.gov/signup/" target="_blank" rel="noopener">api.data.gov</a>
+        key to query official FEC data. It's stored only on this device and
+        is never sent anywhere except directly to the FEC's servers.
+      </p>
+      <form id="api-key-form">
+        <label for="api-key">API key</label>
+        <input id="api-key" type="password" autocomplete="off" placeholder="Paste your api.data.gov key" />
+        <button type="submit">Save</button>
+      </form>
+      <p id="status" role="status"></p>
+    </section>
+  </main>
+  <script src="options.js" type="module"></script>
+</body>
+</html>

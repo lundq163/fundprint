@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Fundprint</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <main>
+    <h1>Fundprint</h1>
+
+    <div class="row">
+      <label for="global-toggle">Enabled everywhere</label>
+      <input id="global-toggle" type="checkbox" role="switch" />
+    </div>
+
+    <div class="row">
+      <label for="site-toggle">Enabled on <span id="site-host">this site</span></label>
+      <input id="site-toggle" type="checkbox" role="switch" />
+    </div>
+
+    <div class="row count-row">
+      <span>Names found on this page:</span>
+      <strong id="match-count">&mdash;</strong>
+    </div>
+    <p id="count-note" class="note">(scanning isn't built yet &mdash; coming in Milestone 2)</p>
+
+    <p class="footer">
+      <a id="open-options" href="#">Options</a>
+    </p>
+  </main>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

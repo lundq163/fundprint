@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Welcome to Fundprint</title>
+  <link rel="stylesheet" href="welcome.css" />
+</head>
+<body>
+  <main>
+    <h1>Welcome to Fundprint</h1>
+    <p>
+      Fundprint is a nonpartisan transparency tool. While it's on, it looks
+      for the names of US federal candidates and members of Congress on the
+      pages you browse, and gives them a subtle underline. Hover over one to
+      see a summary of how that candidate's campaign is funded, sourced from
+      official FEC filings.
+    </p>
+
+    <h2>One setup step: add your free FEC API key</h2>
+    <p>
+      Fundprint uses the official OpenFEC API, which requires a free API
+      key. Your key is stored only on your own device
+      (<code>chrome.storage.local</code>) and is never sent anywhere except
+      directly to the FEC's servers.
+    </p>
+    <ol>
+      <li>Get a free key at <a href="https://api.data.gov/signup/" target="_blank" rel="noopener">api.data.gov/signup</a>.</li>
+      <li>Paste it into the Fundprint options page.</li>
+    </ol>
+    <p>
+      <a id="open-options" href="#">Open Fundprint options &rarr;</a>
+    </p>
+
+    <h2>Good to know</h2>
+    <ul>
+      <li>Fundprint presents facts only &mdash; no scores, labels, or ratings.</li>
+      <li>We never show individual donors' names, only their employer.</li>
+      <li>This beta runs on all sites you visit. See LIMITATIONS.md in the project for details, and use the popup to turn it off globally or per-site any time.</li>
+    </ul>
+  </main>
+  <script src="welcome.js" type="module"></script>
+</body>
+</html>

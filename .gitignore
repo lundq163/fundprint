@@ -1,0 +1,16 @@
+# Dependencies (none yet, but reserved for future tooling)
+node_modules/
+
+# Secrets - never commit API keys or env files
+.env
+.env.*
+*.key
+*secret*
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor junk
+.vscode/
+*.swp
