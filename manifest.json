@@ -51,7 +51,9 @@
 
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "contextMenus",
+    "notifications"
   ],
 
   "host_permissions": [

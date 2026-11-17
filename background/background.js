@@ -8,13 +8,66 @@
 //    network calls to the FEC API happen here, never in the content
 //    script or detail pages — they only ever message us.
 //  - Milestone 5: also answer the candidate/funder detail tabs.
+//  - Milestone 6: the right-click "Look up funding" fallback.
 
 import { getSummary, getTopFunders, getCandidateDetail, getFunderDetail } from "../providers/fecProvider.js";
+import { buildMatcher } from "../common/matcher.js";
+
+const LOOKUP_MENU_ID = "fundprint-lookup";
 
 chrome.runtime.onInstalled.addListener((details) => {
+  // contextMenus items don't survive an extension reload/update, so this
+  // has to run on every onInstalled firing (install AND update), not just
+  // first install. removeAll() first makes it safe to run repeatedly.
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: LOOKUP_MENU_ID,
+      title: "Look up funding",
+      contexts: ["selection"],
+    });
+  });
+
   if (details.reason === "install") {
     chrome.tabs.create({ url: chrome.runtime.getURL("welcome/welcome.html") });
   }
+});
+
+// Lazily built once, reused for every right-click lookup — same matcher
+// logic the content script uses, so the fallback behaves consistently
+// (e.g. it won't match a bare last name either, same as on-page scanning).
+let matcherPromise = null;
+function getMatcher() {
+  if (!matcherPromise) {
+    matcherPromise = fetch(chrome.runtime.getURL("data/legislators.json"))
+      .then((r) => r.json())
+      .then((legislators) => buildMatcher(legislators.map((l) => ({ id: l.id, names: l.names }))));
+  }
+  return matcherPromise;
+}
+
+chrome.contextMenus.onClicked.addListener(async (info) => {
+  if (info.menuItemId !== LOOKUP_MENU_ID) return;
+
+  const selectedText = info.selectionText || "";
+  const matcher = await getMatcher();
+  const matches = matcher.findMatches(selectedText);
+
+  if (matches.length === 0) {
+    chrome.notifications.create({
+      type: "basic",
+      iconUrl: chrome.runtime.getURL("icons/icon128.png"),
+      title: "Fundprint",
+      message: `No current member of Congress matched "${selectedText.slice(0, 60)}".`,
+    });
+    return;
+  }
+
+  // A longer selection could contain more than one name; use the first
+  // one found. If that name itself is ambiguous (shared by more than one
+  // current legislator), use the first id — same known limitation as the
+  // hover card (see LIMITATIONS.md).
+  const id = matches[0].ids[0];
+  chrome.tabs.create({ url: chrome.runtime.getURL(`detail/candidate.html?id=${encodeURIComponent(id)}`) });
 });
 
 chrome.runtime.onMessage.addListener((message) => {

@@ -551,7 +551,9 @@ async function openCardFor(span) {
   positionCard(span.getBoundingClientRect());
 }
 
-function closeCard() {
+// Exported so content.js can close an open card immediately if the user
+// toggles Fundprint off mid-session (see content.js's disableScanning()).
+export function closeCard() {
   isCardOpen = false;
   currentSpan = null;
   cancelOpenTimer();

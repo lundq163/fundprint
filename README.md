@@ -61,6 +61,25 @@ and treats every candidate and party identically.
 - Individual donors' names and addresses are never displayed. Individual
   contributions are grouped by employer only.
 
+## Permissions
+
+What each permission in `manifest.json` is for, and roughly what the
+Chrome Web Store shows users about it (exact wording varies by Chrome
+version — this is the gist):
+
+| Permission | Why Fundprint needs it | What the Web Store tells users |
+|---|---|---|
+| `storage` | Save your API key and on/off preferences locally. | No warning shown — considered low-risk. |
+| `activeTab` | Read the current tab's URL only when you click the toolbar icon, so the popup can show/toggle the right site. | No warning shown — access is limited to the moment you invoke the extension. |
+| `contextMenus` | Add the "Look up funding" right-click menu item. | No warning shown. |
+| `notifications` | Show a notification when "Look up funding" can't find a match. | May be listed as "Display notifications." |
+| `host_permissions` (`https://api.open.fec.gov/*`) | Call the official FEC API directly from the background worker. | Something like "Read and change your data on api.open.fec.gov." |
+| `content_scripts` matches (`<all_urls>`) | Scan page text for candidate names on every site, as a deliberate beta choice (see LIMITATIONS.md). | **The big one** — "Read and change all your data on all websites." This is the permission most worth scrutinizing before installing, and the one we plan to revisit before a public launch (see ROADMAP.md). |
+
+`web_accessible_resources` isn't a user-facing permission — it's a manifest
+detail that lets the content script load a few of the extension's own
+bundled files (the matcher, the legislator list, the hover card module).
+
 ## Project status
 
 This project is being built in milestones; see the commit history for

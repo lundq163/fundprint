@@ -10,6 +10,14 @@
 // directly), but it dynamically imports the real ES modules it depends on
 // — that's a well-supported way to reuse module code from a content
 // script without duplicating it.
+//
+// The global/per-site on/off toggle works live, not just on page reload:
+// flipping it in the popup is reflected here via chrome.storage.onChanged.
+// To keep the "never do unnecessary work" performance goal even with that,
+// the heavier dependencies (the ~1800-variant matcher, the hover card
+// module) are loaded lazily on first actual need, not unconditionally at
+// startup — a page that's disabled the whole time it's open never pays
+// for them.
 
 if (window.__fundprintInjected) {
   // Defensive guard; MV3 shouldn't normally inject twice into one frame.
@@ -19,18 +27,10 @@ if (window.__fundprintInjected) {
 }
 
 async function main() {
-  const [{ buildMatcher }, { getGlobalEnabled, isSiteEnabled }] = await Promise.all([
-    import(chrome.runtime.getURL("common/matcher.js")),
-    import(chrome.runtime.getURL("common/storage.js")),
-  ]);
-
-  const [globalEnabled, siteEnabled] = await Promise.all([
-    getGlobalEnabled(),
-    isSiteEnabled(location.hostname),
-  ]);
+  const { getGlobalEnabled, isSiteEnabled } = await import(chrome.runtime.getURL("common/storage.js"));
 
   let matchCount = 0;
-  const disabled = !globalEnabled || !siteEnabled;
+  let disabled = !(await getGlobalEnabled()) || !(await isSiteEnabled(location.hostname));
 
   // Always answer the popup's count query, even when disabled, so the UI
   // can say so rather than just showing a stale/empty count.
@@ -40,17 +40,27 @@ async function main() {
     }
   });
 
-  if (disabled) return;
-
-  const [legislators, { initHoverCard }] = await Promise.all([
-    fetch(chrome.runtime.getURL("data/legislators.json")).then((r) => r.json()),
-    import(chrome.runtime.getURL("content/card.js")),
-  ]);
-  const matcher = buildMatcher(legislators.map((l) => ({ id: l.id, names: l.names })));
-  initHoverCard();
-
   const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT", "SELECT", "OPTION"]);
-  const seen = new WeakSet(); // text nodes already scanned, so repeat mutation batches don't redo work
+  let seen = new WeakSet(); // text nodes already scanned, so repeat mutation batches don't redo work
+
+  let matcher = null;
+  let closeCard = null;
+  let depsLoadedPromise = null;
+
+  function ensureDeps() {
+    if (!depsLoadedPromise) {
+      depsLoadedPromise = Promise.all([
+        fetch(chrome.runtime.getURL("data/legislators.json")).then((r) => r.json()),
+        import(chrome.runtime.getURL("common/matcher.js")),
+        import(chrome.runtime.getURL("content/card.js")),
+      ]).then(([legislators, { buildMatcher }, card]) => {
+        matcher = buildMatcher(legislators.map((l) => ({ id: l.id, names: l.names })));
+        closeCard = card.closeCard;
+        card.initHoverCard();
+      });
+    }
+    return depsLoadedPromise;
+  }
 
   function isOwnNode(node) {
     if (node.nodeType === Node.ELEMENT_NODE) {
@@ -126,26 +136,35 @@ async function main() {
     requestIdleCallback(step, { timeout: 500 });
   }
 
-  // --- Initial scan of the whole page ---
-  processQueue(collectTextNodes(document.body));
-
-  // --- Keep scanning content that loads in later ---
+  // --- Watching for dynamically loaded content, start/stoppable so the
+  //     toggle can turn it off and back on without a page reload ---
+  let observer = null;
   const pendingRoots = new Set();
   let debounceTimer = null;
 
-  const observer = new MutationObserver((mutationList) => {
-    for (const mutation of mutationList) {
-      for (const node of mutation.addedNodes) {
-        pendingRoots.add(node);
+  function startObserving() {
+    if (observer) return;
+    observer = new MutationObserver((mutationList) => {
+      for (const mutation of mutationList) {
+        for (const node of mutation.addedNodes) {
+          pendingRoots.add(node);
+        }
+        if (mutation.type === "characterData") {
+          pendingRoots.add(mutation.target);
+        }
       }
-      if (mutation.type === "characterData") {
-        pendingRoots.add(mutation.target);
-      }
-    }
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(runPendingScan, 250);
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
+
+  function stopObserving() {
+    observer?.disconnect();
+    observer = null;
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(runPendingScan, 250);
-  });
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    pendingRoots.clear();
+  }
 
   function runPendingScan() {
     const roots = [...pendingRoots];
@@ -165,4 +184,44 @@ async function main() {
       processQueue(textNodes);
     }
   }
+
+  function unwrapMatches() {
+    for (const span of document.querySelectorAll(".fundprint-match")) {
+      span.replaceWith(document.createTextNode(span.textContent));
+    }
+    seen = new WeakSet();
+    matchCount = 0;
+  }
+
+  async function enableScanning() {
+    await ensureDeps();
+    if (disabled) return; // toggled off again before this finished loading
+    processQueue(collectTextNodes(document.body));
+    startObserving();
+  }
+
+  function disableScanning() {
+    stopObserving();
+    closeCard?.();
+    if (matcher) unwrapMatches(); // nothing to unwrap if deps never loaded
+  }
+
+  if (!disabled) {
+    enableScanning();
+  }
+
+  chrome.storage.onChanged.addListener(async (changes, areaName) => {
+    if (areaName !== "local") return;
+    if (!("globalEnabled" in changes) && !("siteEnabled" in changes)) return;
+
+    const newDisabled = !(await getGlobalEnabled()) || !(await isSiteEnabled(location.hostname));
+    if (newDisabled === disabled) return;
+    disabled = newDisabled;
+
+    if (disabled) {
+      disableScanning();
+    } else {
+      enableScanning();
+    }
+  });
 }
