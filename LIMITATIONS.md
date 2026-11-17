@@ -35,6 +35,16 @@ Plain-language caveats, kept up to date as Fundprint is built.
   fields (receipts, disbursements, cash on hand) for all of them, but
   hasn't been verified against every type — some funder pages may show
   incomplete totals until this gets wider testing.
+- **"Look up funding" can fail silently if OS/Chrome notifications are
+  blocked.** When the right-click lookup finds no match, Fundprint's only
+  feedback is a Chrome notification — if your system or browser has
+  notifications turned off for Chrome, a no-match result looks like
+  nothing happened at all. Check your OS's notification settings for
+  Chrome if the context menu item seems unresponsive. (It should always
+  do *something* — either open a tab or notify — so if you've confirmed
+  notifications are allowed and it's still silent, that's a real bug;
+  check the background service worker's console for a "Fundprint:"
+  error and report it.)
 - **"Dark money" isn't traceable.** Some groups (certain nonprofits and
   other entities) aren't required to disclose their donors. When a
   funding trail reaches one of these groups, it ends there — Fundprint
