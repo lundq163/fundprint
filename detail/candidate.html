@@ -3,21 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <title>Fundprint — Candidate detail</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2.5rem auto; padding: 0 1.5rem; color: #1a1a1a; }
-  </style>
+  <link rel="stylesheet" href="detail.css" />
 </head>
 <body>
-  <h1>Candidate detail (placeholder)</h1>
-  <p>
-    This page will show the full funding breakdown for candidate id
-    <code id="candidate-id">?</code> — top 10 committees, top 10 employers,
-    a breakdown chart, and links to FEC source pages.
-  </p>
-  <p><em>Built out in Milestone 5. For now this just confirms the "Full breakdown" link opens the right page.</em></p>
-  <script>
-    document.getElementById("candidate-id").textContent =
-      new URLSearchParams(location.search).get("id") || "(none)";
-  </script>
+  <main id="content">
+    <p class="state-message"><span class="spinner"></span><span>Loading…</span></p>
+  </main>
+  <script src="candidate.js" type="module"></script>
 </body>
 </html>

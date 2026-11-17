@@ -7,8 +7,9 @@
 //  - Milestone 4: that provider is now the real FEC-backed one. All
 //    network calls to the FEC API happen here, never in the content
 //    script or detail pages — they only ever message us.
+//  - Milestone 5: also answer the candidate/funder detail tabs.
 
-import { getSummary, getTopFunders } from "../providers/fecProvider.js";
+import { getSummary, getTopFunders, getCandidateDetail, getFunderDetail } from "../providers/fecProvider.js";
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") {
@@ -22,6 +23,12 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   if (message?.type === "FUNDPRINT_GET_TOP_FUNDERS") {
     return getTopFunders(message.id);
+  }
+  if (message?.type === "FUNDPRINT_GET_CANDIDATE_DETAIL") {
+    return getCandidateDetail(message.id);
+  }
+  if (message?.type === "FUNDPRINT_GET_FUNDER_DETAIL") {
+    return getFunderDetail(message.id);
   }
   if (message?.type === "FUNDPRINT_OPEN_OPTIONS") {
     // chrome.runtime.openOptionsPage() isn't available to content scripts,

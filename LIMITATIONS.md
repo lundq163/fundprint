@@ -28,6 +28,13 @@ Plain-language caveats, kept up to date as Fundprint is built.
   wait again right away — but it can't make FEC's own query faster. See
   ROADMAP.md for a possible future fix (a proxy server that absorbs this
   wait once, server-side, instead of per user).
+- **Funder detail pages are best-tested against traditional PACs.** FEC
+  committee totals have a somewhat different shape for different
+  committee types (traditional PAC vs. super PAC vs. party committee vs.
+  a candidate's own authorized committee). Fundprint reads the common
+  fields (receipts, disbursements, cash on hand) for all of them, but
+  hasn't been verified against every type — some funder pages may show
+  incomplete totals until this gets wider testing.
 - **"Dark money" isn't traceable.** Some groups (certain nonprofits and
   other entities) aren't required to disclose their donors. When a
   funding trail reaches one of these groups, it ends there — Fundprint

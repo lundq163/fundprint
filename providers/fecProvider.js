@@ -22,7 +22,7 @@
 
 import { fecGet, FecApiError } from "./fecClient.js";
 import { getApiKey } from "../common/storage.js";
-import { getLegislator } from "../common/legislators.js";
+import { getLegislator, getLegislatorByFecId } from "../common/legislators.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
@@ -46,26 +46,27 @@ async function setCached(key, data) {
   await chrome.storage.session.set({ [key]: { data, fetchedAt: Date.now() } });
 }
 
-async function findPrincipalCommitteeId(fecCandidateId, apiKey, cycle) {
+async function findPrincipalCommittee(fecCandidateId, apiKey, cycle) {
   const data = await fecGet(
     `/candidate/${fecCandidateId}/committees/`,
     { cycle, designation: "P" },
     apiKey
   );
-  return data.results?.[0]?.committee_id || null;
+  const result = data.results?.[0];
+  return result ? { id: result.committee_id, name: result.name } : null;
 }
 
-// Committee id lookups are cheap and stable (not an aggregation query),
-// so these get the long TTL unconditionally, cached separately from the
-// funders result so getSummary and getTopFunders can share it.
-async function getPrincipalCommitteeId(fecCandidateId, apiKey, cycle) {
+// Committee lookups are cheap and stable (not an aggregation query), so
+// these get the long TTL unconditionally, cached separately from the
+// funders/detail results so every caller can share one lookup.
+async function getPrincipalCommittee(fecCandidateId, apiKey, cycle) {
   const cacheKey = `fec-committee:${fecCandidateId}:${cycle}`;
   const cached = await getCached(cacheKey, DAY_MS);
-  if (cached) return cached.committeeId;
+  if (cached) return cached;
 
-  const committeeId = await findPrincipalCommitteeId(fecCandidateId, apiKey, cycle);
-  await setCached(cacheKey, { committeeId });
-  return committeeId;
+  const committee = await findPrincipalCommittee(fecCandidateId, apiKey, cycle);
+  await setCached(cacheKey, committee);
+  return committee;
 }
 
 async function fetchTotals(fecCandidateId, apiKey, cycle) {
@@ -77,10 +78,10 @@ async function fetchTotals(fecCandidateId, apiKey, cycle) {
   return data.results?.[0] || null;
 }
 
-async function fetchTopEmployers(committeeId, apiKey, cycle) {
+async function fetchTopEmployers(committeeId, apiKey, cycle, limit = 3) {
   const data = await fecGet(
     "/schedules/schedule_a/by_employer/",
-    { committee_id: committeeId, cycle, sort: "-total", per_page: 3 },
+    { committee_id: committeeId, cycle, sort: "-total", per_page: limit },
     apiKey,
     { timeoutMs: AGGREGATION_TIMEOUT_MS }
   );
@@ -89,7 +90,7 @@ async function fetchTopEmployers(committeeId, apiKey, cycle) {
     .map((r) => ({ employer: r.employer, amount: r.total || 0 }));
 }
 
-async function fetchTopCommittees(committeeId, apiKey, cycle) {
+async function fetchTopCommittees(committeeId, apiKey, cycle, limit = 3) {
   const data = await fecGet(
     "/schedules/schedule_a/",
     {
@@ -122,7 +123,60 @@ async function fetchTopCommittees(committeeId, apiKey, cycle) {
       });
     }
   }
-  return [...totalsByContributor.values()].sort((a, b) => b.amount - a.amount).slice(0, 3);
+  return [...totalsByContributor.values()].sort((a, b) => b.amount - a.amount).slice(0, limit);
+}
+
+async function fetchCommitteeTotals(committeeId, apiKey, cycle) {
+  const data = await fecGet(`/committee/${committeeId}/totals/`, { cycle }, apiKey);
+  return data.results?.[0] || null;
+}
+
+// "Which candidates has this committee given to most" — same approach as
+// fetchTopCommittees but inverted: filter Schedule A by contributor_id
+// (this committee as the GIVER) instead of committee_id (as the
+// recipient), and aggregate by the recipient's candidate_id. FEC's
+// Schedule A records conveniently embed the recipient committee's
+// candidate_id/candidate_name directly when the recipient is a
+// candidate's committee, so no extra lookup is needed for that — only
+// for linking back to our own candidate detail page, which needs the
+// bioguide id instead of the FEC candidate id.
+async function fetchTopCandidatesGivenTo(committeeId, apiKey, cycle, limit = 3) {
+  const data = await fecGet(
+    "/schedules/schedule_a/",
+    {
+      contributor_id: committeeId,
+      two_year_transaction_period: cycle,
+      sort: "-contribution_receipt_amount",
+      per_page: 100,
+    },
+    apiKey,
+    { timeoutMs: AGGREGATION_TIMEOUT_MS }
+  );
+
+  const totalsByCandidate = new Map();
+  for (const record of data.results || []) {
+    if (!record.candidate_id) continue; // not a candidate committee recipient
+    const existing = totalsByCandidate.get(record.candidate_id);
+    const amount = record.contribution_receipt_amount || 0;
+    if (existing) {
+      existing.amount += amount;
+    } else {
+      totalsByCandidate.set(record.candidate_id, {
+        fecCandidateId: record.candidate_id,
+        name: record.candidate_name || record.candidate_id,
+        amount,
+      });
+    }
+  }
+
+  const top = [...totalsByCandidate.values()].sort((a, b) => b.amount - a.amount).slice(0, limit);
+  await Promise.all(
+    top.map(async (entry) => {
+      const legislator = await getLegislatorByFecId(entry.fecCandidateId);
+      entry.bioguideId = legislator?.id || null;
+    })
+  );
+  return top;
 }
 
 function errorResult(err, id) {
@@ -208,9 +262,9 @@ export async function getTopFunders(id) {
     }
   }
 
-  let committeeId;
+  let committee;
   try {
-    committeeId = await getPrincipalCommitteeId(legislator.fecCandidateId, apiKey, cycle);
+    committee = await getPrincipalCommittee(legislator.fecCandidateId, apiKey, cycle);
   } catch {
     const result = {
       topCommittees: [],
@@ -222,11 +276,12 @@ export async function getTopFunders(id) {
     return result;
   }
 
-  if (!committeeId) {
+  if (!committee) {
     const result = { topCommittees: [], topEmployers: [] };
     await setCached(cacheKey, result);
     return result;
   }
+  const committeeId = committee.id;
 
   const [employersResult, committeesResult] = await Promise.allSettled([
     fetchTopEmployers(committeeId, apiKey, cycle),
@@ -241,4 +296,143 @@ export async function getTopFunders(id) {
   };
   await setCached(cacheKey, result);
   return result;
+}
+
+const DETAIL_LIST_LIMIT = 10;
+
+// Candidate detail page: same shape as getSummary()'s totals, plus the
+// full breakdown (debts, disbursements) and top-10 (not top-3) funder
+// lists in one call — a dedicated tab can afford to wait slightly longer
+// than a hover card for the complete picture.
+export async function getCandidateDetail(id) {
+  const legislator = await getLegislator(id);
+  if (!legislator || !legislator.fecCandidateId) {
+    return { notFound: true, id };
+  }
+
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    return { missingApiKey: true, id };
+  }
+
+  const cycle = currentCycle();
+  const cacheKey = `fec-detail:${id}:${cycle}`;
+  const cached = await getCached(cacheKey, DAY_MS);
+  if (cached) return cached;
+
+  let totals;
+  let committee;
+  try {
+    [totals, committee] = await Promise.all([
+      fetchTotals(legislator.fecCandidateId, apiKey, cycle),
+      getPrincipalCommittee(legislator.fecCandidateId, apiKey, cycle),
+    ]);
+  } catch (err) {
+    return errorResult(err, id);
+  }
+  if (!totals) {
+    return { notFound: true, id };
+  }
+
+  const [employersResult, committeesResult] = committee
+    ? await Promise.allSettled([
+        fetchTopEmployers(committee.id, apiKey, cycle, DETAIL_LIST_LIMIT),
+        fetchTopCommittees(committee.id, apiKey, cycle, DETAIL_LIST_LIMIT),
+      ])
+    : [
+        { status: "fulfilled", value: [] },
+        { status: "fulfilled", value: [] },
+      ];
+
+  const detail = {
+    id,
+    name: `${legislator.first} ${legislator.last}`,
+    party: legislator.party,
+    state: legislator.state,
+    district: legislator.district,
+    chamber: legislator.chamber,
+    cycle: `${cycle - 1}–${cycle}`,
+    totals: {
+      raised: totals.receipts || 0,
+      disbursements: totals.disbursements || 0,
+      cashOnHand: totals.last_cash_on_hand_end_period || 0,
+      fromIndividuals: totals.individual_contributions || 0,
+      fromIndividualsItemized: totals.individual_itemized_contributions || 0,
+      fromIndividualsUnitemized: totals.individual_unitemized_contributions || 0,
+      fromCommittees: totals.other_political_committee_contributions || 0,
+      fromPartyCommittees: totals.political_party_committee_contributions || 0,
+      selfFunding: totals.candidate_contribution || 0,
+      debtsOwedByCommittee: totals.last_debts_owed_by_committee || 0,
+      debtsOwedToCommittee: totals.last_debts_owed_to_committee || 0,
+    },
+    topEmployers: employersResult.status === "fulfilled" ? employersResult.value : [],
+    topEmployersUnavailable: employersResult.status === "rejected",
+    topCommittees: committeesResult.status === "fulfilled" ? committeesResult.value : [],
+    topCommitteesUnavailable: committeesResult.status === "rejected",
+    asOfDate: (totals.coverage_end_date || "").slice(0, 10),
+    fecCandidateUrl: `https://www.fec.gov/data/candidate/${legislator.fecCandidateId}/`,
+    committeeId: committee?.id || null,
+    committeeName: committee?.name || null,
+    fecCommitteeUrl: committee ? `https://www.fec.gov/data/committee/${committee.id}/` : null,
+  };
+
+  await setCached(cacheKey, detail);
+  return detail;
+}
+
+// Funder detail page (a committee/PAC rather than a candidate): what kind
+// of committee it is, its own totals, its own top funders (same
+// aggregation helpers as above, just pointed at this committee instead of
+// a candidate's), and which candidates it has given to most.
+export async function getFunderDetail(committeeId) {
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    return { missingApiKey: true, id: committeeId };
+  }
+
+  const cycle = currentCycle();
+  const cacheKey = `fec-funder-detail:${committeeId}:${cycle}`;
+  const cached = await getCached(cacheKey, DAY_MS);
+  if (cached) return cached;
+
+  let committeeTotals;
+  try {
+    committeeTotals = await fetchCommitteeTotals(committeeId, apiKey, cycle);
+  } catch (err) {
+    return errorResult(err, committeeId);
+  }
+  if (!committeeTotals) {
+    return { notFound: true, id: committeeId };
+  }
+
+  const [employersResult, committeesResult, candidatesResult] = await Promise.allSettled([
+    fetchTopEmployers(committeeId, apiKey, cycle, DETAIL_LIST_LIMIT),
+    fetchTopCommittees(committeeId, apiKey, cycle, DETAIL_LIST_LIMIT),
+    fetchTopCandidatesGivenTo(committeeId, apiKey, cycle, DETAIL_LIST_LIMIT),
+  ]);
+
+  const detail = {
+    id: committeeId,
+    name: committeeTotals.committee_name || committeeId,
+    committeeTypeFull: committeeTotals.committee_type_full || null,
+    designationFull: committeeTotals.committee_designation_full || null,
+    organizationTypeFull: committeeTotals.organization_type_full || null,
+    partyFull: committeeTotals.party_full || null,
+    totals: {
+      receipts: committeeTotals.receipts || 0,
+      disbursements: committeeTotals.disbursements || 0,
+      cashOnHand: committeeTotals.last_cash_on_hand_end_period || 0,
+    },
+    asOfDate: (committeeTotals.coverage_end_date || "").slice(0, 10),
+    topEmployers: employersResult.status === "fulfilled" ? employersResult.value : [],
+    topEmployersUnavailable: employersResult.status === "rejected",
+    topCommittees: committeesResult.status === "fulfilled" ? committeesResult.value : [],
+    topCommitteesUnavailable: committeesResult.status === "rejected",
+    topCandidates: candidatesResult.status === "fulfilled" ? candidatesResult.value : [],
+    topCandidatesUnavailable: candidatesResult.status === "rejected",
+    fecCommitteeUrl: `https://www.fec.gov/data/committee/${committeeId}/`,
+  };
+
+  await setCached(cacheKey, detail);
+  return detail;
 }
