@@ -1,16 +1,25 @@
 # Roadmap
 
-## v1 (current focus)
+## v1 — built
 
 - Current US House and Senate members only (see LIMITATIONS.md for why
   presidential candidates aren't included yet).
 - Name detection against a bundled list built from the
   unitedstates/congress-legislators dataset.
-- Hover card with a funding summary, sourced live from the OpenFEC API.
-- Candidate and funder (PAC/committee) detail pages in new tabs.
+- Hover card with a funding summary, sourced live from the OpenFEC API,
+  cached, with a loading spinner and all error states (missing/invalid
+  key, rate-limited, no data found, partial-unavailable sections).
+- Candidate and funder (PAC/committee) detail pages in new tabs, with a
+  funding-breakdown chart on the candidate page.
 - Right-click "Look up funding" fallback on selected text.
-- Per-site and global on/off switches.
+- Per-site and global on/off switches — live, no reload needed.
 - Users supply their own free FEC API key.
+- A keyboard/screen-reader accessibility pass (ARIA roles on matched
+  names, focus management, color-contrast fixes) and a couple of
+  performance hardenings for long/dynamic pages (see commit history for
+  Milestone 7 specifics).
+
+Not published to the Chrome Web Store yet — see below.
 
 ## v2 and beyond
 

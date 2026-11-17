@@ -62,6 +62,17 @@ Plain-language caveats, kept up to date as Fundprint is built.
   official OpenFEC API, which requires a free key from api.data.gov. A
   future version may remove this requirement via a proxy server (see
   ROADMAP.md).
+- **Accessibility pass was code-level, not tested with real assistive
+  tech.** ARIA roles/labels, focus management, and color contrast were
+  reviewed and fixed against WCAG guidelines and computed contrast
+  ratios, but the result hasn't been tried with an actual screen reader
+  (VoiceOver, NVDA, etc.). Please report anything that doesn't announce
+  or behave as expected.
+- **Performance hardening for long/dynamic pages hasn't been verified on
+  real sites yet** (only reasoned through and fixed in code — e.g.
+  skipping redundant checks on the first scan, bounding how long
+  continuous page churn can delay scanning). Report any noticeable
+  slowdown or jank on a specific site.
 - **Runs on all sites during the beta.** As a deliberate, temporary
   choice, Fundprint's content script runs on every page you visit so it
   can look for candidate names anywhere. You can turn it off globally or

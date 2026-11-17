@@ -94,20 +94,27 @@ function openFunderDetail(committeeId) {
 }
 
 function renderStateMessage(message, { openOptionsButton = false } = {}) {
-  const children = [el("p", { className: "state-message", text: message })];
+  const messageEl = el("p", { className: "state-message", role: "status", tabindex: "-1", text: message });
+  const children = [messageEl];
   if (openOptionsButton) {
     const btn = el("button", { text: "Open options" });
     btn.addEventListener("click", () => chrome.runtime.sendMessage({ type: "FUNDPRINT_OPEN_OPTIONS" }));
     children.push(el("div", { className: "actions" }, [btn]));
   }
   content.replaceChildren(...children);
+  messageEl.focus();
 }
 
 function renderDetail(detail) {
   document.title = `${detail.name} — Fundprint`;
 
+  // tabIndex -1 + focus() once rendered (below) so screen reader users get
+  // a clear signal the page finished loading — the standard pattern for a
+  // page whose real content replaces a loading state asynchronously,
+  // since there's no full navigation/reload event to announce it for you.
+  const heading = el("h1", { text: detail.name, tabindex: "-1" });
   const children = [
-    el("div", { className: "header" }, [el("h1", { text: detail.name }), partyBadge(detail.party)]),
+    el("div", { className: "header" }, [heading, partyBadge(detail.party)]),
     el("div", { className: "subline", text: `${officeLabel(detail)} · ${detail.cycle} cycle` }),
   ];
 
@@ -185,6 +192,7 @@ function renderDetail(detail) {
   children.push(linksSection);
 
   content.replaceChildren(...children);
+  heading.focus();
 }
 
 async function main() {

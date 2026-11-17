@@ -72,14 +72,21 @@ async function main() {
     return false;
   }
 
-  function collectTextNodes(root) {
+  // skipOwnNodeCheck: the very first full-page scan runs before any
+  // .fundprint-match span exists, so parent.closest(".fundprint-match")
+  // is guaranteed to walk all the way to <body> and find nothing for
+  // every single node — wasted work on exactly the pass most likely to
+  // be large (a long article's first scan). Incremental (mutation-
+  // triggered) scans still need the check, since they can see our own
+  // freshly-inserted spans.
+  function collectTextNodes(root, skipOwnNodeCheck = false) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
         const parent = node.parentElement;
         if (!parent) return NodeFilter.FILTER_REJECT;
         if (SKIP_TAGS.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
         if (parent.isContentEditable) return NodeFilter.FILTER_REJECT;
-        if (parent.closest(".fundprint-match")) return NodeFilter.FILTER_REJECT;
+        if (!skipOwnNodeCheck && parent.closest(".fundprint-match")) return NodeFilter.FILTER_REJECT;
         if (seen.has(node)) return NodeFilter.FILTER_REJECT;
         if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
@@ -104,8 +111,16 @@ async function main() {
       span.dataset.fundprintIds = m.ids.join(",");
       span.dataset.fundprintName = m.text;
       // Focusable so keyboard users can reach it; card.js handles what
-      // happens on hover/focus.
+      // happens on hover/focus. The ARIA attributes tell assistive tech
+      // this is an interactive control that opens a dialog, not just a
+      // plain name — without them, a screen reader would read the name
+      // and nothing else, with no hint that anything is interactive here.
+      // aria-expanded is kept in sync by card.js as the card opens/closes.
       span.tabIndex = 0;
+      span.setAttribute("role", "button");
+      span.setAttribute("aria-haspopup", "dialog");
+      span.setAttribute("aria-expanded", "false");
+      span.setAttribute("aria-label", `${m.text} — campaign funding info`);
       span.textContent = m.text;
       frag.appendChild(span);
       cursor = m.end;
@@ -138,9 +153,13 @@ async function main() {
 
   // --- Watching for dynamically loaded content, start/stoppable so the
   //     toggle can turn it off and back on without a page reload ---
+  const DEBOUNCE_MS = 250;
+  const MAX_WAIT_MS = 2000; // see comment below
+
   let observer = null;
   const pendingRoots = new Set();
   let debounceTimer = null;
+  let pendingSince = null;
 
   function startObserving() {
     if (observer) return;
@@ -153,8 +172,15 @@ async function main() {
           pendingRoots.add(mutation.target);
         }
       }
+      if (pendingSince === null) pendingSince = Date.now();
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(runPendingScan, 250);
+      // A page with continuous churn (a live blog, a ticking widget) keeps
+      // resetting this debounce, which could otherwise delay scanning
+      // indefinitely. Once we've been waiting more than MAX_WAIT_MS, scan
+      // immediately instead of pushing the deadline out again.
+      const waitedAlready = Date.now() - pendingSince;
+      const delay = waitedAlready >= MAX_WAIT_MS ? 0 : DEBOUNCE_MS;
+      debounceTimer = setTimeout(runPendingScan, delay);
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
   }
@@ -164,11 +190,13 @@ async function main() {
     observer = null;
     clearTimeout(debounceTimer);
     pendingRoots.clear();
+    pendingSince = null;
   }
 
   function runPendingScan() {
     const roots = [...pendingRoots];
     pendingRoots.clear();
+    pendingSince = null;
     const textNodes = [];
     for (const root of roots) {
       if (!root.isConnected || isOwnNode(root)) continue;
@@ -196,7 +224,7 @@ async function main() {
   async function enableScanning() {
     await ensureDeps();
     if (disabled) return; // toggled off again before this finished loading
-    processQueue(collectTextNodes(document.body));
+    processQueue(collectTextNodes(document.body, /* skipOwnNodeCheck */ true));
     startObserving();
   }
 

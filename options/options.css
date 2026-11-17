@@ -9,12 +9,19 @@ body {
 
 form {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   margin-top: 0.75rem;
 }
 
 label {
-  display: none; /* input placeholder + surrounding text already describes it */
+  /* Previously display:none — that removes a label from the
+     accessibility tree entirely (not just visually), so the input had no
+     reliable accessible name. A visible label is the simplest fix and
+     arguably better UX too (placeholder text disappears once you type). */
+  font-size: 0.9rem;
+  color: #333;
+  white-space: nowrap;
 }
 
 input[type="password"] {

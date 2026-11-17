@@ -28,7 +28,7 @@ h1 {
 
 .note {
   font-size: 0.75rem;
-  color: #777;
+  color: #707070; /* #777 was just under the 4.5:1 WCAG AA text-contrast threshold */
   margin: 0.1rem 0 0;
 }
 

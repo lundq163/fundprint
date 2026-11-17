@@ -63,7 +63,7 @@ const CARD_STYLES = `
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    color: #777;
+    color: #707070; /* #777 was just under the 4.5:1 WCAG AA text-contrast threshold */
     margin: 10px 0 4px;
   }
   ul { list-style: none; margin: 0; padding: 0; }
@@ -78,7 +78,7 @@ const CARD_STYLES = `
     cursor: pointer;
     text-align: left;
   }
-  .as-of { font-size: 11px; color: #888; margin-top: 10px; }
+  .as-of { font-size: 11px; color: #666; margin-top: 10px; } /* #888 failed 4.5:1 (3.54:1) */
   .actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
   .actions a, .actions button {
     font: inherit;
@@ -103,7 +103,7 @@ const CARD_STYLES = `
     height: 20px;
     border: none;
     background: transparent;
-    color: #777;
+    color: #707070; /* #777 was just under the 4.5:1 WCAG AA text-contrast threshold */
     font-size: 14px;
     line-height: 1;
     cursor: pointer;
@@ -208,6 +208,19 @@ function onKeyDown(event) {
     return;
   }
 
+  if (event.key === "Enter" || event.key === " ") {
+    // Focusing a name already opens its card (see onFocusIn), but a
+    // role="button" element is expected by ARIA convention to also
+    // respond to Enter/Space directly — this just re-affirms the open
+    // (a harmless no-op if it's already showing for this exact span).
+    const span = matchSpan(event.target);
+    if (span === event.target) {
+      event.preventDefault(); // Space would otherwise scroll the page
+      openCardFor(span);
+    }
+    return;
+  }
+
   if (event.key === "Tab") {
     const focusables = getCardFocusables();
     // When focus is inside an open shadow root, document.activeElement
@@ -272,6 +285,12 @@ function ensureCardHost() {
   cardEl.appendChild(closeBtn);
 
   bodyEl = document.createElement("div");
+  // Focus intentionally stays on the triggering span when the card opens
+  // via hover or auto-focus, not inside the card (see Tab-handling in
+  // onKeyDown) — so without this, a screen reader user would have no way
+  // to know the card's content even exists unless they manually tabbed
+  // into it. aria-live announces it automatically as it loads/updates.
+  bodyEl.setAttribute("aria-live", "polite");
   cardEl.appendChild(bodyEl);
 
   shadowRoot.appendChild(cardEl);
@@ -313,7 +332,10 @@ function officeLabel(summary) {
 }
 
 function loadingRow(text) {
-  return el("p", { className: "state-message" }, [el("span", { className: "spinner" }), el("span", { text })]);
+  return el("p", { className: "state-message" }, [
+    el("span", { className: "spinner", "aria-hidden": "true" }),
+    el("span", { text }),
+  ]);
 }
 
 function renderLoading(name) {
@@ -479,8 +501,17 @@ function positionCard(anchorRect) {
 
 async function openCardFor(span) {
   ensureCardHost();
+  // Moving the mouse directly from one matched name to another reaches
+  // here without closeCard() ever running for the first one (its pending
+  // close timer gets cancelled by the new span's mouseover before it
+  // fires) — so its aria-expanded has to be reset here, not just in
+  // closeCard(), or it's left stuck "true" indefinitely.
+  if (currentSpan && currentSpan !== span) {
+    currentSpan.setAttribute("aria-expanded", "false");
+  }
   currentSpan = span;
   isCardOpen = true;
+  span.setAttribute("aria-expanded", "true");
   const token = ++requestToken;
 
   const name = span.dataset.fundprintName || span.textContent;
@@ -555,6 +586,7 @@ async function openCardFor(span) {
 // toggles Fundprint off mid-session (see content.js's disableScanning()).
 export function closeCard() {
   isCardOpen = false;
+  currentSpan?.setAttribute("aria-expanded", "false");
   currentSpan = null;
   cancelOpenTimer();
   cancelCloseTimer();

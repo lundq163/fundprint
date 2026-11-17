@@ -12,7 +12,7 @@ or a specific funder (e.g. a PAC) and who funds *it*.
 Fundprint presents facts only. It does not label, score, or rate candidates,
 and treats every candidate and party identically.
 
-**Status:** early development (not yet published to the Chrome Web Store).
+**Status:** MVP feature-complete; not yet published to the Chrome Web Store.
 
 ## Setup (developer / beta testing)
 
@@ -35,6 +35,9 @@ and treats every candidate and party identically.
   the card to open a full breakdown in a new tab.
 - Select any text and right-click to use **Look up funding** as a fallback
   if a name isn't automatically underlined.
+- Keyboard accessible: Tab to a name to open its card immediately, Tab
+  again to reach the card's buttons, Shift+Tab to go back to the name,
+  and Esc to close it from anywhere.
 
 ## Data sources
 
@@ -82,6 +85,10 @@ bundled files (the matcher, the legislator list, the hover card module).
 
 ## Project status
 
-This project is being built in milestones; see the commit history for
-progress. See [ROADMAP.md](ROADMAP.md) for what's planned next and
+The MVP feature set described above is built: name detection, the hover
+card with real FEC data and caching, candidate/funder detail tabs, the
+right-click fallback, per-site/global toggles, and an accessibility pass.
+See the commit history for how it was built milestone by milestone. It
+hasn't been published to the Chrome Web Store yet — see
+[ROADMAP.md](ROADMAP.md) for what's planned before/after that, and
 [LIMITATIONS.md](LIMITATIONS.md) for current caveats.

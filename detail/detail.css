@@ -145,7 +145,7 @@ h2 {
 
 .as-of {
   font-size: 0.85rem;
-  color: #888;
+  color: #666; /* #888 failed the 4.5:1 WCAG AA text-contrast threshold (3.54:1) */
 }
 
 .source-links {
