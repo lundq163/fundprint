@@ -49,12 +49,18 @@ Not published to the Chrome Web Store yet — see below.
   client-side 8s timeout plus a short-TTL cache of the "unavailable"
   outcome; worth revisiting once there's a proxy (see above) or a
   different aggregation strategy.
-- **Revisit always-on activation.** Before a public Chrome Web Store
-  listing, reconsider running on `<all_urls>` by default — e.g. optional
-  host permissions, or click-to-activate per site.
+- **Switch to click-to-activate (decided 2026-11-19).** Before a public
+  Chrome Web Store listing, drop the always-on `<all_urls>` content
+  script in favor of click-to-activate (the user clicks the toolbar icon
+  to turn Fundprint on for that tab, granted via `activeTab` /
+  `optional_host_permissions` rather than a blanket content script).
+  Chosen over "optional host permissions you grant once per site" to
+  minimize both the permission footprint and the Web Store review
+  scrutiny that `<all_urls>` draws — not yet implemented.
 - **State and local races.**
 - **New entity types beyond politicians** (e.g. companies), via new data
   providers behind the same matcher/provider/UI architecture.
 - **Firefox / Edge support.**
-- **Chrome Web Store listing**, including store-review-ready copy for the
-  `<all_urls>` permission justification.
+- **Chrome Web Store listing.** See the submission checklist (shared
+  separately) for the full asset/policy/review requirements — this is
+  blocked on the click-to-activate switch above.
