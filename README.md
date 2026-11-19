@@ -1,5 +1,7 @@
 # Fundprint
 
+[![Tests](https://github.com/lundq163/fundprint/actions/workflows/test.yml/badge.svg)](https://github.com/lundq163/fundprint/actions/workflows/test.yml)
+
 Fundprint is a nonpartisan browser extension. While enabled, it detects the
 names of US federal candidates and members of Congress on the pages you
 browse and gives them a subtle underline. Hovering over an underlined name
