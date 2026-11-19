@@ -83,6 +83,27 @@ version — this is the gist):
 detail that lets the content script load a few of the extension's own
 bundled files (the matcher, the legislator list, the hover card module).
 
+## Testing
+
+Unit tests cover the non-DOM logic — name matching, settings storage, the
+legislator lookup, and the FEC provider's request/caching/field-mapping
+logic (`common/`, `providers/`). Content-script/DOM code (`content/`) and
+the detail pages aren't covered yet; see
+[#12](https://github.com/lundq163/fundprint/issues/12) for what's still
+manual-only.
+
+```
+npm install
+npm test
+```
+
+Runs automatically on every push/PR via GitHub Actions
+(`.github/workflows/test.yml`).
+
+## License
+
+[MIT](LICENSE).
+
 ## Project status
 
 The MVP feature set described above is built: name detection, the hover

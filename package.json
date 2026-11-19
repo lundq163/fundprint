@@ -1,0 +1,12 @@
+{
+  "name": "fundprint",
+  "private": true,
+  "type": "module",
+  "description": "Nonpartisan transparency tool: see how a candidate's campaign is funded, from official FEC data.",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "5.1.1"
+  }
+}
